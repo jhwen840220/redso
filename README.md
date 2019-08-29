@@ -1,6 +1,6 @@
 # redso_test
 
-> My slick Nuxt.js project
+> [Demo](http://34.68.199.227:8080/)
 
 ## Build Setup
 
