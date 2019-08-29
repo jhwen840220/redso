@@ -2,66 +2,58 @@
   <div class="container">
     <div class="row">
       <div class="map-panel col-12 col-lg-8">
-      <GmapMap
-        ref="mapRef"
-        :center="center"
-        :zoom="13"
-        map-type-id="roadmap"
-        style="width: 100%; height: 100%"
-        @dragend="getNewList"
-        @zoom_changed="getNewList"
-      >
-        <GmapMarker
-          :key="index"
-          v-for="(m, index) in r_list"
-          :position="m.geometry.location"
-          :clickable="true"
-          @click="setValue(m)"
-        />
-      </GmapMap>
+        <GmapMap
+          ref="mapRef"
+          :center="center"
+          :zoom="13"
+          map-type-id="roadmap"
+          style="width: 100%; height: 100%"
+          @dragend="getNewList"
+          @zoom_changed="getNewList"
+        >
+          <GmapMarker
+            :key="index"
+            :icon="place_id==m.place_id ? 'selected_marker.png':'marker.png'"
+            :z-index="place_id==m.place_id ? 11:10"
+            v-for="(m, index) in r_list"
+            :position="m.geometry.location"
+            :clickable="true"
+            @click="setValue(m)"
+          />
+        </GmapMap>
       </div>
       <div class="search-panel col-12 col-lg-4">
         <div class="detail-frame">
-          <a-list
-            itemLayout="horizontal"
-            :dataSource="Object.keys(r_detail)"
-          >
+          <a-list itemLayout="horizontal" :dataSource="Object.keys(r_detail)">
             <a-list-item slot="renderItem" slot-scope="item, index">
-              <a-list-item-meta
-                :description="r_detail[item]"
-              >
+              <a-list-item-meta :description="r_detail[item]">
                 <div slot="title">{{detail_name[item]}}</div>
               </a-list-item-meta>
             </a-list-item>
           </a-list>
         </div>
         <div class="list-frame">
-          <a-list
-            size="small"
-            bordered
-            :dataSource="r_list"
-          >
-            <a-list-item slot="renderItem" slot-scope="item, index"
-            :class="{selected: place_id==item.place_id}"
-            @click="setValue(item)">{{item.name}}</a-list-item>
-            <div slot="header">店家名稱
-              <a-popover
-              placement="right"
-              title="Title"
-              trigger="click"
-              v-model="toolTip_visible"
-              >
+          <a-list size="small" bordered :dataSource="r_list">
+            <a-list-item
+              slot="renderItem"
+              slot-scope="item, index"
+              :class="{selected: place_id==item.place_id}"
+              @click="setValue(item)"
+            >{{item.name}}</a-list-item>
+            <div slot="header">
+              店家名稱
+              <a-popover placement="right" title="Title" trigger="click" v-model="toolTip_visible">
                 <div class="ml-2 btn btn-sm btn-info">篩選</div>
                 <div slot="content">
-                  <a-radio-group @change="filterList" v-model="filter">
-                    <a-radio :value="1">Option A</a-radio>
-                    <a-radio :value="2">Option B</a-radio>
-                    <a-radio :value="3">Option C</a-radio>
+                  <a-radio-group @change="changeFilter" v-model="filter">
+                    <a-radio :value="'location'">距離</a-radio>
+                    <a-radio :value="'rating'">評分</a-radio>
+                    <a-radio :value="'name'">名稱</a-radio>
                   </a-radio-group>
                 </div>
               </a-popover>
             </div>
-        </a-list>
+          </a-list>
         </div>
       </div>
     </div>
@@ -108,13 +100,50 @@ export default {
       this.place_id = "";
       this.r_detail = {};
       const center = `${this.$refs.mapRef.$mapObject.center.lat()},${this.$refs.mapRef.$mapObject.center.lng()}`;
-      const res = await callList({
+      const postData = {
         location: center,
-        radius: 500,
+        radius: 1000,
         type: "restaurant",
         language: "zh-TW"
-      });
+      };
+      const finalPostData = { ...postData };
+      if (this.filter == "location") {
+        delete finalPostData.radius;
+        finalPostData.rankby = "distance";
+      }
+
+      const res = await callList(finalPostData);
+
       this.r_list = res.data.results;
+      if (this.filter == "rating") {
+        this.r_list.sort((a, b) => {
+          return b.rating - a.rating;
+        });
+      }
+      if (this.filter == "name") {
+        this.r_list.sort((a, b) => {
+          var nameA = a.name;
+          var nameB = b.name;
+          if (nameA < nameB) {
+            return -1;
+          }
+          if (nameA > nameB) {
+            return 1;
+          }
+
+          // names must be equal
+          return 0;
+        });
+      }
+      // console.log(
+      //   this.r_list.sort((a, b) => {
+      //     return b.rating - a.rating;
+      //   })
+      // );
+    },
+    changeFilter(e) {
+      this.filter = e.target.value;
+      this.getNewList();
     },
     async filterList() {
       this.place_id = "";
@@ -133,11 +162,12 @@ export default {
   async mounted() {
     const res = await callList({
       location: "24.985175,121.440307",
-      radius: 10000,
+      radius: 1000,
       type: "restaurant",
       language: "zh-TW"
     });
     this.r_list = res.data.results;
+    console.log(this.r_list);
   }
 };
 </script>
